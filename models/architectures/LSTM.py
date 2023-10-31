@@ -9,6 +9,6 @@ class VanillaLSTM(nn.Module):
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
-        output = self.fc1(lstm_out[:, -1, :])  
+        output = self.fc1(lstm_out)
         output = self.fc2(output)
         return output
