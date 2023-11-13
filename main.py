@@ -1,6 +1,7 @@
 import argparse
 import numpy as np
 import os
+import random
 import torch
 import pandas as pd
 import torch.nn as nn
@@ -30,6 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--num_workers", type=int, default=0)
     parser.add_argument("--patience", type=int, default=7)
     parser.add_argument("--learning_rate", type=float, default=0.001)
+    parser.add_argument("--seed", type=int, default=2001)
     
     parser.add_argument("--optimizer", type=str, default="Adam")
     parser.add_argument("--loss", type=str, default="MSE")
@@ -38,7 +40,20 @@ if __name__ == "__main__":
     class MainExp:
         def __init__(self, args):
             self.args = args
+            self._set_seed()
             self._build_model()
+            
+        def _set_seed(self):
+            np.random.seed(self.args.seed)
+            random.seed(self.args.seed)
+            torch.manual_seed(self.args.seed)
+            torch.cuda.manual_seed(self.args.seed)
+            # When running on the CuDNN backend, two further options must be set
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = False
+            # Set a fixed value for the hash seed
+            # os.environ["PYTHONHASHSEED"] = str(self.args.seed)
+            print(f"Random seed set as {self.args.seed}")
             
         def _build_model(self):
             model_dict = {
@@ -48,7 +63,10 @@ if __name__ == "__main__":
                 'VanillaLSTM': VanillaLSTMConfig
             }
 
-            self.model = model_dict[self.args.model](self.args, config_dict[self.args.model]())
+            configs = config_dict[self.args.model]()
+            self.model = model_dict[self.args.model](self.args, configs)
+            if configs.weight_path is not None:
+                self.model.load_state_dict(torch.load(configs.weight_path))
             
         def _get_criterion(self):
             loss_dict = {
