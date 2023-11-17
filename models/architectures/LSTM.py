@@ -3,9 +3,9 @@ import torch.nn as nn
 class VanillaLSTM(nn.Module):
     def __init__(self, args, configs):
         super(VanillaLSTM, self).__init__()
-        input_size = args.seq_len
+        input_size = args.sequence_length
         units = configs.units
-        output_size = args.pred_len
+        output_size = args.prediction_length
 
         self.lstm = nn.LSTM(input_size, units[0])  
         self.fc1 = nn.Linear(units[0], units[1])  

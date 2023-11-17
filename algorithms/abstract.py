@@ -1,69 +1,77 @@
+import torch
+import torch.nn as nn
+from torch import optim
+from models.architectures.LSTM import VanillaLSTM
+from configs.model_configs import VanillaLSTMConfig
+from torch.utils.data import Dataset, DataLoader
+import numpy as np
+from pathlib import Path
+import time
+from callbacks.early_stopping import EarlyStopping
+
 class AbstractAlgorithm:
-    def __init__(self, configs, save_dir='.'):
-        self.history = None
-        self.time_used = '0s'
-        self.model = None
-        self.configs = yaml_load(configs)
+    model_dict = {
+        'VanillaLSTM': VanillaLSTM,
+    }
+    config_dict = {
+        'VanillaLSTM': VanillaLSTMConfig,
+    }
+    loss_dict = {
+        "MSE": nn.MSELoss,
+    }
+    optimizer_dict = {
+        "Adam": optim.Adam,
+    }
+    scheduler_dict = {
+        "StepLR": optim.lr_scheduler.StepLR,
+    }
 
-        self.dir_log          = 'logs'
-        self.dir_plot         = 'plots'
-        self.dir_weight       = 'weights'
-        self.mkdirs(path=save_dir)
+    class DataGenerator(Dataset):
+        def __init__(self, X, y):
+            self.X = torch.Tensor(X)
+            self.y = torch.Tensor(y)
 
-        self.best_weight = None
+        def __len__(self):
+            return len(self.X)
 
-    def mkdirs(self, path):
-        path = Path(path)
-        self.path_log          = path / self.dir_log
-        self.path_plot         = path / self.dir_plot
-        self.path_weight       = path / self.dir_weight
+        def __getitem__(self, index):
+            return self.X[index], self.y[index]
 
-        for p in [self.path_log, self.path_plot, self.path_weight]: 
-            p.mkdir(parents=True, exist_ok=True)
+    def preprocessing(self, 
+                      x, 
+                      y, 
+                      batchsz:int):
+        return DataLoader(self.DataGenerator(x, y), batch_size=batchsz, shuffle=True)
+    
+    def __init__(self, opt, save_dir):
+        self.opt = opt
+        self.path_weight = Path(save_dir) / opt.model /  'weights'
+        self.path_weight.mkdir(parents=True, exist_ok=True)
+    
+    def train(self, xtrain, ytrain, xval, yval, extension='.pt'):
+        start = time.time()
+        if extension != '.pt':
+            best = Path(self.path_weight, self.__class__.__name__, 'best')
+            last = Path(self.path_weight, self.__class__.__name__, 'last')
+        else:
+            best = Path(self.path_weight, self.__class__.__name__)
+            last = best
+        best.mkdir(parents=True, exist_ok=True)
+        last.mkdir(parents=True, exist_ok=True)
 
-    @abstractmethod
-    def build(self, *inputs):
-        raise NotImplementedError 
+        configs = AbstractAlgorithm.config_dict[self.opt.model]()
+        self.model = AbstractAlgorithm.model_dict[self.opt.model](self.opt, configs)
+        if configs.weight_path is not None:
+            self.model.load_state_dict(torch.load(configs.weight_path))
+        criterion = AbstractAlgorithm.loss_dict[self.opt.loss]()
+        optimizer = AbstractAlgorithm.optimizer_dict[self.opt.optimizer](self.model.parameters(),lr=self.opt.learning_rate)
+        scheduler = AbstractAlgorithm.scheduler_dict[self.opt.scheduler](optimizer, step_size=10, gamma=0.1)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model.to(device)
+        early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
+        train_loader = self.preprocessing(x=xtrain, y=ytrain, batchsz=self.opt.batch_size)
+        val_loader = self.preprocessing(x=xval, y=yval, batchsz=self.opt.batch_size)
+        self.time_used = time.time() - start
 
-    @abstractmethod
-    def preprocessing(self, *inputs):
-        raise NotImplementedError
-
-    @abstractmethod
-    def fit(self, *inputs):
-        raise NotImplementedError
-
-    @abstractmethod
-    def save(self, *inputs):
-        raise NotImplementedError
-
-    @abstractmethod
-    def load(self, *inputs):
-        raise NotImplementedError
-
-    @abstractmethod
-    def predict(self, *inputs):
-        raise NotImplementedError
-
-    def plot(self, save_dir, y, yhat, dataset):
-        try:
-            save_plot(filename=os.path.join(self.path_plot, f'{self.__class__.__name__}-{dataset}.png'),
-                      data=[{'data': [range(len(y)), y],
-                             'color': 'green',
-                             'label': 'y'},
-                            {'data': [range(len(yhat)), yhat],
-                             'color': 'red',
-                             'label': 'yhat'}],
-                      xlabel='Sample',
-                      ylabel='Value')
-        except: pass
-
-    def score(self, 
-              y, 
-              yhat, 
-              scaler=None,
-              r=-1):
-        return score(y=y, 
-                     yhat=yhat, 
-                     scaler=scaler,
-                     r=r)
+        
+    
