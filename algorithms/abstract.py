@@ -73,5 +73,21 @@ class AbstractAlgorithm:
         val_loader = self.preprocessing(x=xval, y=yval, batchsz=self.opt.batch_size)
         self.time_used = time.time() - start
 
+        for epoch in range(self.opt.epochs):
+            for i, (batch_x, batch_y) in enumerate(train_loader):
+                optimizer.zero_grad()
+                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                batch_x = batch_x.permute(0, 2, 1)
+
+                outputs = self.model(batch_x)
+                dims = -1
+                outputs = outputs[:, dims:, :].squeeze()
+
+                loss = criterion(outputs, batch_y)
+                loss.backward()
+                optimizer.step()
+                if i % 100 == 0:
+                    print(f'Epoch [{epoch+1}/{self.opt.epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}')
+
         
     
