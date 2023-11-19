@@ -34,6 +34,7 @@ def main(opt):
         opt.model = model
         algo = AbstractAlgorithm(opt, save_dir=save_dir)
         algo.train(xtrain, ytrain, xval, yval)
+        algo.evaluate(xtest, ytest)
     return
 
 def run(**kwargs):

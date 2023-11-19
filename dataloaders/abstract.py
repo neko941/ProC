@@ -127,7 +127,10 @@ class AbstractLoader():
         targetColumns = [item for sublist in [targetColumns[i:i + len(targetFeatures)] for i in range(0, len(targetColumns), len(targetFeatures))][::-1] for item in sublist]
         
         # Drop nulls
-        df = df[[dateFeature, *trainColumns, *targetColumns]].drop_nulls()
+        # print(trainColumns)
+        # print(targetColumns)
+        # exit()
+        df = df[list_uniqifier([dateFeature, *trainColumns, *targetColumns])].drop_nulls()
 
         # Get train, val, test idx for splitting
         num_samples = len(df)

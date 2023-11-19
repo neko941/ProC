@@ -8,6 +8,7 @@ import numpy as np
 from pathlib import Path
 import time
 from callbacks.early_stopping import EarlyStopping
+from sklearn.metrics import r2_score
 
 class AbstractAlgorithm:
     model_dict = {
@@ -88,6 +89,44 @@ class AbstractAlgorithm:
                 optimizer.step()
                 if i % 100 == 0:
                     print(f'Epoch [{epoch+1}/{self.opt.epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}')
+
+
+    def evaluate(self, x, y):
+        self.model.eval()  # Set the model to evaluation mode
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+        val_loader = self.preprocessing(x=x, y=y, batchsz=self.opt.batch_size)
+        total_loss = 0.0
+        all_predictions = []
+        all_targets = []
+
+        with torch.no_grad():
+            for batch_x, batch_y in val_loader:
+                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                batch_x = batch_x.permute(0, 2, 1)
+
+                outputs = self.model(batch_x)
+                dims = -1
+                outputs = outputs[:, dims:, :].squeeze()
+
+                criterion = AbstractAlgorithm.loss_dict[self.opt.loss]()
+                loss = criterion(outputs, batch_y)
+                total_loss += loss.item()
+
+                all_predictions.append(outputs.cpu().numpy())
+                all_targets.append(batch_y.cpu().numpy())
+
+        average_loss = total_loss / len(val_loader)
+        print(f'Loss: {average_loss:.4f}')
+
+        all_predictions = np.concatenate(all_predictions, axis=0)
+        all_targets = np.concatenate(all_targets, axis=0)
+
+        r2 = r2_score(all_targets, all_predictions)
+        print(f'R-squared (R2) Score: {r2:.4f}')
+
+        return average_loss, r2
+
 
         
     
