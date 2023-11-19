@@ -2,7 +2,7 @@ import argparse
 
 def parse_opt(ROOT, known=False):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epochs', type=int, default=10_000_000, help='total training epochs')
+    parser.add_argument('--epochs', type=int, default=100, help='total training epochs')
     parser.add_argument('--learning_rate', type=float, default=0.001, help='')
     parser.add_argument('--batch_size', type=int, default=64, help='total batch size for all GPUs')
     parser.add_argument('--sequence_length', type=int, default=5, help='')
