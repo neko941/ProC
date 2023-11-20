@@ -9,31 +9,16 @@ ROOT = Path(os.path.relpath(ROOT, Path.cwd()))  # relative
 
 from utils.options import parse_opt
 from utils.general import increment_path 
-from utils.general import set_seed 
 from utils.general import list_uniqifier 
-from dataloaders.loaders import SalinityDataset
 from algorithms.abstract import AbstractAlgorithm
 
 def main(opt):
-    save_dir = str(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok, mkdir=True))
-    set_seed(opt.seed)
-    dataset = SalinityDataset(low_memory=opt.low_memory, normalization=opt.normalization)
-    xtrain, ytrain, xval, yval, xtest, ytest = dataset(save_dir=save_dir,
-                                                       split_ratio=(opt.train_size, opt.val_size, 1-opt.train_size-opt.val_size),
-                                                       lag=opt.sequence_length,
-                                                       ahead=opt.prediction_length,
-                                                       offset=opt.offset)
-    print(f'{xtrain.shape = }')
-    print(f'{ytrain.shape = }')
-    print(f'{xval.shape = }')
-    print(f'{yval.shape = }')
-    print(f'{xtest.shape = }')
-    print(f'{ytest.shape = }')
+    opt.save_dir = str(increment_path(Path(opt.project) / opt.name, exist_ok=opt.exist_ok, mkdir=True))
     
     for model in list_uniqifier(opt.models):
         opt.model = model
-        algo = AbstractAlgorithm(opt, save_dir=save_dir)
-        algo.train(xtrain, ytrain, xval, yval)
+        algo = AbstractAlgorithm(opt)
+        algo.train()
     return
 
 def run(**kwargs):
