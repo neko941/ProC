@@ -19,6 +19,7 @@ def main(opt):
         opt.model = model
         algo = AbstractAlgorithm(opt)
         algo.train()
+        algo.evaluate()
     return
 
 def run(**kwargs):
