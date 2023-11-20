@@ -3,55 +3,27 @@ import torch.nn as nn
 from torch import optim
 from models.architectures.LSTM import VanillaLSTM
 from configs.model_configs import VanillaLSTMConfig
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 import numpy as np
 from pathlib import Path
 import time
+import random
 from callbacks.early_stopping import EarlyStopping
+from dataloaders.salinity import SalinityDSLoader
 from sklearn.metrics import r2_score
 
 class AbstractAlgorithm:
-    model_dict = {
-        'VanillaLSTM': VanillaLSTM,
-    }
-    config_dict = {
-        'VanillaLSTM': VanillaLSTMConfig,
-    }
-    loss_dict = {
-        "MSE": nn.MSELoss,
-    }
-    optimizer_dict = {
-        "Adam": optim.Adam,
-    }
-    scheduler_dict = {
-        "StepLR": optim.lr_scheduler.StepLR,
-    }
-
-    class DataGenerator(Dataset):
-        def __init__(self, X, y):
-            self.X = torch.Tensor(X)
-            self.y = torch.Tensor(y)
-
-        def __len__(self):
-            return len(self.X)
-
-        def __getitem__(self, index):
-            return self.X[index], self.y[index]
-
-    def preprocessing(self, 
-                      x, 
-                      y, 
-                      batchsz:int):
-        return DataLoader(self.DataGenerator(x, y), batch_size=batchsz, shuffle=True)
-    
-    def __init__(self, opt, save_dir):
+    def __init__(self, opt):
         self.opt = opt
-        self.path_weight = Path(save_dir) / opt.model /  'weights'
+        self._set_seed()
+        self._create_dir()
+        self.model = self._build_model()
+
+    def _create_dir(self):
+        self.path_weight = Path(self.opt.save_dir) / self.opt.model /  'weights'
         self.path_weight.mkdir(parents=True, exist_ok=True)
-    
-    def train(self, xtrain, ytrain, xval, yval, extension='.pt'):
-        start = time.time()
-        if extension != '.pt':
+        
+        if self.opt.extension != '.pt':
             best = Path(self.path_weight, self.__class__.__name__, 'best')
             last = Path(self.path_weight, self.__class__.__name__, 'last')
         else:
@@ -59,19 +31,69 @@ class AbstractAlgorithm:
             last = best
         best.mkdir(parents=True, exist_ok=True)
         last.mkdir(parents=True, exist_ok=True)
-
-        configs = AbstractAlgorithm.config_dict[self.opt.model]()
-        self.model = AbstractAlgorithm.model_dict[self.opt.model](self.opt, configs)
+        
+    def _build_model(self):
+        model_dict = {
+            'VanillaLSTM': VanillaLSTM,
+        }
+        config_dict = {
+            'VanillaLSTM': VanillaLSTMConfig,
+        }
+        configs = config_dict[self.opt.model]()
+        model = model_dict[self.opt.model](self.opt, configs)
         if configs.weight_path is not None:
-            self.model.load_state_dict(torch.load(configs.weight_path))
-        criterion = AbstractAlgorithm.loss_dict[self.opt.loss]()
-        optimizer = AbstractAlgorithm.optimizer_dict[self.opt.optimizer](self.model.parameters(),lr=self.opt.learning_rate)
-        scheduler = AbstractAlgorithm.scheduler_dict[self.opt.scheduler](optimizer, step_size=10, gamma=0.1)
+            model.load_state_dict(torch.load(configs.weight_path))
+        return model
+    
+    def _get_criterion(self):
+        loss_dict = {
+            "MSE": nn.MSELoss,
+        }
+        return loss_dict[self.opt.loss]()
+    
+    def _get_optimizer(self):
+        optimizer_dict = {
+            "Adam": optim.Adam,
+        }
+        return optimizer_dict[self.opt.optimizer](self.model.parameters(),lr=self.opt.learning_rate)
+
+    def _get_scheduler(self, optimizer):
+        scheduler_dict = {
+            "StepLR": optim.lr_scheduler.StepLR,
+        }
+        return scheduler_dict[self.opt.scheduler](optimizer, step_size=10, gamma=0.1)
+    
+    def _get_loader(self, type='train'):
+        loader_dict = {
+            'SalinityDSLoader': SalinityDSLoader,
+        }
+        loader = loader_dict[self.opt.loader](self.opt)
+        return loader._get_loader(type=type)
+    
+    def _set_seed(self):
+        np.random.seed(self.opt.seed)
+        random.seed(self.opt.seed)
+        torch.manual_seed(self.opt.seed)
+        torch.cuda.manual_seed(self.opt.seed)
+        # When running on the CuDNN backend, two further options must be set
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = False
+        # Set a fixed value for the hash seed
+        # os.environ["PYTHONHASHSEED"] = str(self.opt.seed)
+        print(f"Random seed set as {self.opt.seed}")
+    
+    def train(self):
+        start = time.time()
+
+        criterion = self._get_criterion()
+        optimizer = self._get_optimizer()
+        scheduler = self._get_scheduler(optimizer=optimizer)
+
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(device)
         early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
-        train_loader = self.preprocessing(x=xtrain, y=ytrain, batchsz=self.opt.batch_size)
-        val_loader = self.preprocessing(x=xval, y=yval, batchsz=self.opt.batch_size)
+        train_loader = self._get_loader(type='train')
+        val_loader = self._get_loader(type='val')
         self.time_used = time.time() - start
 
         for epoch in range(self.opt.epochs):
@@ -91,17 +113,17 @@ class AbstractAlgorithm:
                     print(f'Epoch [{epoch+1}/{self.opt.epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}')
 
 
-    def evaluate(self, x, y):
+    def evaluate(self):
         self.model.eval()  # Set the model to evaluation mode
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        val_loader = self.preprocessing(x=x, y=y, batchsz=self.opt.batch_size)
+        test_loader = self._get_loader(type='test')
         total_loss = 0.0
         all_predictions = []
         all_targets = []
 
         with torch.no_grad():
-            for batch_x, batch_y in val_loader:
+            for batch_x, batch_y in test_loader:
                 batch_x, batch_y = batch_x.to(device), batch_y.to(device)
                 batch_x = batch_x.permute(0, 2, 1)
 
@@ -109,14 +131,14 @@ class AbstractAlgorithm:
                 dims = -1
                 outputs = outputs[:, dims:, :].squeeze()
 
-                criterion = AbstractAlgorithm.loss_dict[self.opt.loss]()
+                criterion = self._get_criterion()
                 loss = criterion(outputs, batch_y)
                 total_loss += loss.item()
 
                 all_predictions.append(outputs.cpu().numpy())
                 all_targets.append(batch_y.cpu().numpy())
 
-        average_loss = total_loss / len(val_loader)
+        average_loss = total_loss / len(test_loader)
         print(f'Loss: {average_loss:.4f}')
 
         all_predictions = np.concatenate(all_predictions, axis=0)

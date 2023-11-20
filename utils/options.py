@@ -20,6 +20,8 @@ def parse_opt(ROOT, known=False):
     parser.add_argument('--normalization', type=str, default=None, choices=[None, 'minmax', 'standard', 'robust'], help='')
     parser.add_argument('--exist_ok', action='store_true', help='existing project/name ok, do not increment')
     parser.add_argument('--low_memory', action='store_true', help='Ultilize disk')
+    parser.add_argument('--extension', type=str, choices=['.pt'], default='.pt', help='extension of weight file')
+    parser.add_argument('--loader', type=str, choices=['SalinityDSLoader'], default='SalinityDSLoader', help='loader')
     parser.add_argument('--models', 
                         action='append', 
                         choices=['VanillaLSTM', 'VanillaRNN'], 
