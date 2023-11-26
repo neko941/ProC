@@ -2,7 +2,8 @@ import torch
 import torch.nn as nn
 from torch import optim
 from models.architectures.LSTM import VanillaLSTM
-from configs.model_configs import VanillaLSTMConfig
+from models.architectures.PatchTST import PatchTST
+from configs.model_configs import VanillaLSTMConfig, PatchTSTConfig
 from torch.utils.data import Dataset
 import numpy as np
 from pathlib import Path
@@ -35,9 +36,11 @@ class AbstractAlgorithm:
     def _build_model(self):
         model_dict = {
             'VanillaLSTM': VanillaLSTM,
+            'PatchTST': PatchTST,
         }
         config_dict = {
             'VanillaLSTM': VanillaLSTMConfig,
+            'PatchTST': PatchTSTConfig,
         }
         configs = config_dict[self.opt.model]()
         model = model_dict[self.opt.model](self.opt, configs)
