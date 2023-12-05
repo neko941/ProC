@@ -11,6 +11,7 @@ import time
 import random
 from callbacks.early_stopping import EarlyStopping
 from dataloaders.salinity import SalinityDSLoader
+from dataloaders.provider import provider
 from sklearn.metrics import r2_score
 
 class AbstractAlgorithm:
@@ -95,26 +96,31 @@ class AbstractAlgorithm:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(device)
         early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
-        train_loader = self._get_loader(type='train')
-        val_loader = self._get_loader(type='val')
+        # train_loader = self._get_loader(type='train')
+        # val_loader = self._get_loader(type='val')
+        train_loader = provider(self.opt, flag='train')
+        val_loader = provider(self.opt, flag='val')
         self.time_used = time.time() - start
 
         for epoch in range(self.opt.epochs):
             for i, (batch_x, batch_y) in enumerate(train_loader):
                 optimizer.zero_grad()
-                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                batch_x, batch_y = batch_x.float().to(device), batch_y.float().to(device)
                 batch_x = batch_x.permute(0, 2, 1)
 
                 outputs = self.model(batch_x)
-                dims = -1
-                outputs = outputs[:, dims:, :].squeeze()
+                dims = 0
+                
+                outputs = outputs[:, -self.opt.prediction_length:, dims:]
+                batch_y = batch_y[:, -self.opt.prediction_length:, dims:]
 
                 loss = criterion(outputs, batch_y)
                 loss.backward()
                 optimizer.step()
-                if i % 100 == 0:
-                    print(f'Epoch [{epoch+1}/{self.opt.epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}')
-
+                print(f'Epoch [{epoch+1}/{self.opt.epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}')
+            print(f'Epoch [{epoch+1}/{self.opt.epochs}], Loss: {loss.item():.4f}')
+            if epoch == 10:
+                exit()
 
     def evaluate(self):
         self.model.eval()  # Set the model to evaluation mode

@@ -28,3 +28,4 @@ class PatchTSTConfig():
         self.pe = 'zeros'
         self.learn_pe = True
         
+        self.weight_path = None

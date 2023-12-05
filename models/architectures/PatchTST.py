@@ -33,7 +33,11 @@ class PatchTST(nn.Module):
         self.patch_len = configs.patch_len
         self.padding_patch = configs.padding_patch
         self.stride = configs.stride
-        patch_num = int((self.seq_len - self.patch_len) / self.stride) + 1
+        patch_num = int((self.seq_len - self.patch_len) / self.stride + 1)
+        
+        if self.padding_patch == 'end':
+            self.padding_patch_layer = nn.ReplicationPad1d((0, self.stride))
+            patch_num += 1
         
         self.store_attention = configs.store_attention
         self.res_attention = configs.res_attention
@@ -47,14 +51,9 @@ class PatchTST(nn.Module):
                                  pre_norm=self.pre_norm, pe=self.pe, learn_pe=self.learn_pe)
         
         self.head_nf = self.d_model * patch_num
-        
-        if self.padding_patch == 'end':
-            self.padding_patch_layer = nn.ReplicationPad1d((0, self.stride))
-            patch_num += 1
-        
         self.head = FlattenHead(self.head_nf, self.pred_len, head_dropout=self.head_dropout)
             
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:                                                 # x: [bs x nvars x seq_len]):
         if self.padding_patch == 'end':
             z = self.padding_patch_layer(x)
 
@@ -63,7 +62,7 @@ class PatchTST(nn.Module):
         
         z = self.model(z)                                                                   # z: [bs x nvars x d_model x patch_num] 
         z = self.head(z)                                                                    # z: [bs x nvars x pred_len]
-        
+        z = z.permute(0, 2, 1)                                                               # z: [bs x pred_len x nvars]
         return z
 
 class FlattenHead(nn.Module):
@@ -86,10 +85,9 @@ class TSTiEncoder(nn.Module):  #i means channel-independent
                  d_k=None, d_v=None, d_ff=256, norm='BatchNorm', attn_dropout=0., 
                  dropout=0., act="gelu", store_attention=False, res_attention=True, 
                  pre_norm=False, pe='zeros', learn_pe=True):
-        
-        
+
         super().__init__()
-        
+
         self.patch_num = patch_num
         self.patch_len = patch_len
         
@@ -105,12 +103,11 @@ class TSTiEncoder(nn.Module):  #i means channel-independent
         self.dropout = nn.Dropout(dropout)
 
         # Encoder
-        self.encoder = TSTEncoder(q_len, d_model, n_heads, d_k=d_k, d_v=d_v, d_ff=d_ff, norm=norm, attn_dropout=attn_dropout, dropout=dropout,
+        self.encoder = TSTEncoder(d_model, n_heads, d_k=d_k, d_v=d_v, d_ff=d_ff, norm=norm, attn_dropout=attn_dropout, dropout=dropout,
                                    pre_norm=pre_norm, activation=act, res_attention=res_attention, n_layers=n_layers, store_attention=store_attention)
 
         
-    def forward(self, x) -> Tensor:                                                 # x: [bs x nvars x patch_len x patch_num]
-        
+    def forward(self, x: Tensor) -> Tensor:                                                 # x: [bs x nvars x patch_len x patch_num]
         n_vars = x.shape[1]
         # Input encoding
         x = x.permute(0, 1, 3, 2)                                                   # x: [bs x nvars x patch_num x patch_len]
