@@ -9,6 +9,7 @@ import numpy as np
 from pathlib import Path
 import time
 import random
+import math
 from callbacks.early_stopping import EarlyStopping
 from dataloaders.salinity import SalinityDSLoader
 from dataloaders.provider import provider
@@ -61,10 +62,16 @@ class AbstractAlgorithm:
         }
         return optimizer_dict[self.opt.optimizer](self.model.parameters(),lr=self.opt.learning_rate)
 
-    def _get_scheduler(self, optimizer):
+    def _get_scheduler(self, optimizer, training_steps=-1):
         scheduler_dict = {
             "StepLR": optim.lr_scheduler.StepLR,
+            "LambdaLR": optim.lr_scheduler.LambdaLR,
         }
+        if self.opt.scheduler == 'LambdaLR':
+            warmup_steps = self.opt.warmup_steps if self.opt.warmup_steps > 0 else math.ceil(self.opt.warmup_ratio * training_steps)
+            lr_lambda = lambda step: 1.0 if step >= warmup_steps else float(step) / float(max(1, warmup_steps))
+            return scheduler_dict[self.opt.scheduler](optimizer, lr_lambda=lr_lambda)
+
         return scheduler_dict[self.opt.scheduler](optimizer, step_size=10, gamma=0.1)
     
     def _get_loader(self, type='train'):
@@ -119,8 +126,6 @@ class AbstractAlgorithm:
                 optimizer.step()
                 print(f'Epoch [{epoch+1}/{self.opt.epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}')
             print(f'Epoch [{epoch+1}/{self.opt.epochs}], Loss: {loss.item():.4f}')
-            if epoch == 10:
-                exit()
 
     def evaluate(self):
         self.model.eval()  # Set the model to evaluation mode
@@ -137,8 +142,10 @@ class AbstractAlgorithm:
                 batch_x = batch_x.permute(0, 2, 1)
 
                 outputs = self.model(batch_x)
-                dims = -1
-                outputs = outputs[:, dims:, :].squeeze()
+                dims = 0
+                
+                outputs = outputs[:, -self.opt.prediction_length:, dims:]
+                batch_y = batch_y[:, -self.opt.prediction_length:, dims:]
 
                 criterion = self._get_criterion()
                 loss = criterion(outputs, batch_y)
