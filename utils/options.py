@@ -27,7 +27,7 @@ def parse_opt(ROOT, known=False):
                         choices=['VanillaLSTM', 'VanillaRNN', 'PatchTST'], 
                         required=True)
     parser.add_argument('--warmup_steps', type=int, default=0, help='warmup steps for learning rate scheduler')
-    parser.add_argument('==warmup_ratio', type=float, default=0.1, help='warmup ratio for learning rate scheduler')
+    parser.add_argument('--warmup_ratio', type=float, default=0.1, help='warmup ratio for learning rate scheduler')
 
     # PatchTST
     parser.add_argument('--enc_in', type=int, default=21, help='')

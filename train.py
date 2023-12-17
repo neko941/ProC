@@ -19,6 +19,7 @@ def main(opt):
         opt.model = model
         algo = AbstractAlgorithm(opt)
         algo.train()
+        print('Evaluating...')
         algo.evaluate()
     return
 

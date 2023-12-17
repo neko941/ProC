@@ -131,14 +131,15 @@ class AbstractAlgorithm:
         self.model.eval()  # Set the model to evaluation mode
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        test_loader = self._get_loader(type='test')
+        # test_loader = self._get_loader(type='test')
+        test_loader = provider(self.opt, flag='test')
         total_loss = 0.0
         all_predictions = []
         all_targets = []
 
         with torch.no_grad():
             for batch_x, batch_y in test_loader:
-                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                batch_x, batch_y = batch_x.float().to(device), batch_y.float().to(device)
                 batch_x = batch_x.permute(0, 2, 1)
 
                 outputs = self.model(batch_x)
@@ -157,8 +158,11 @@ class AbstractAlgorithm:
         average_loss = total_loss / len(test_loader)
         print(f'Loss: {average_loss:.4f}')
 
-        all_predictions = np.concatenate(all_predictions, axis=0)
-        all_targets = np.concatenate(all_targets, axis=0)
+        all_predictions = np.array(all_predictions)
+        all_targets = np.array(all_targets)
+        
+        all_predictions = np.reshape(all_predictions, (all_predictions.shape[0] * all_predictions.shape[1], -1))
+        all_targets = np.reshape(all_targets, (all_targets.shape[0] * all_targets.shape[1], -1))
 
         r2 = r2_score(all_targets, all_predictions)
         print(f'R-squared (R2) Score: {r2:.4f}')
