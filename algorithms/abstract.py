@@ -14,6 +14,7 @@ from callbacks.early_stopping import EarlyStopping
 from dataloaders.salinity import SalinityDSLoader
 from dataloaders.provider import provider
 from sklearn.metrics import r2_score
+from utils.visuals import progress_bar
 
 class AbstractAlgorithm:
     def __init__(self, opt):
@@ -94,39 +95,53 @@ class AbstractAlgorithm:
         print(f"Random seed set as {self.opt.seed}")
     
     def train(self):
-        start = time.time()
+        # start = time.time()
 
         criterion = self._get_criterion()
         optimizer = self._get_optimizer()
-        scheduler = self._get_scheduler(optimizer=optimizer)
+        # scheduler = self._get_scheduler(optimizer=optimizer)
 
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(device)
-        early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
+        # early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
         # train_loader = self._get_loader(type='train')
         # val_loader = self._get_loader(type='val')
         train_loader = provider(self.opt, flag='train')
-        val_loader = provider(self.opt, flag='val')
-        self.time_used = time.time() - start
+        # val_loader = provider(self.opt, flag='val')
+        # self.time_used = time.time() - start
 
-        for epoch in range(self.opt.epochs):
-            for i, (batch_x, batch_y) in enumerate(train_loader):
-                optimizer.zero_grad()
-                batch_x, batch_y = batch_x.float().to(device), batch_y.float().to(device)
-                batch_x = batch_x.permute(0, 2, 1)
+        from rich.table import Table
+        from rich.console import Console
+        console = Console()
+        table = Table(show_header=True, header_style="bold magenta")
+        table.add_column("Epoch", style="dim", width=12)
+        table.add_column("Average Loss", justify="right")
 
-                outputs = self.model(batch_x)
-                dims = 0
-                
-                outputs = outputs[:, -self.opt.prediction_length:, dims:]
-                batch_y = batch_y[:, -self.opt.prediction_length:, dims:]
+        with progress_bar() as progress:
+            samples = len(train_loader)
+            overall_task = progress.add_task("[green]Epochs", total=self.opt.epochs)
+            subtask = progress.add_task("[red]Step", total=samples)
+            for _ in range(self.opt.epochs):
+                running_loss = 0.0
+                for batch_x, batch_y in train_loader:
+                    optimizer.zero_grad()
+                    batch_x, batch_y = batch_x.float().to(device), batch_y.float().to(device)
+                    batch_x = batch_x.permute(0, 2, 1)
 
-                loss = criterion(outputs, batch_y)
-                loss.backward()
-                optimizer.step()
-                print(f'Epoch [{epoch+1}/{self.opt.epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}')
-            print(f'Epoch [{epoch+1}/{self.opt.epochs}], Loss: {loss.item():.4f}')
+                    outputs = self.model(batch_x)
+                    dims = 0
+                    
+                    outputs = outputs[:, -self.opt.prediction_length:, dims:]
+                    batch_y = batch_y[:, -self.opt.prediction_length:, dims:]
 
+                    loss = criterion(outputs, batch_y)
+                    running_loss += loss.item()
+                    loss.backward()
+                    optimizer.step()
+                    progress.update(subtask, advance=1, description=f'[red]Step   | loss: {loss.item():.4f}')
+                progress.reset(subtask, total=samples)
+                progress.update(overall_task, advance=1, description=f'[green]Epochs | loss: {running_loss / samples:.4f}')
+        
     def evaluate(self):
         self.model.eval()  # Set the model to evaluation mode
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
