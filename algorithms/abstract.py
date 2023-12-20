@@ -15,13 +15,15 @@ from dataloaders.salinity import SalinityDSLoader
 from dataloaders.provider import provider
 from sklearn.metrics import r2_score
 from utils.visuals import progress_bar
+from utils.visuals import table
 
 class AbstractAlgorithm:
     def __init__(self, opt):
         self.opt = opt
         self._set_seed()
         self._create_dir()
-        self.model = self._build_model()
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.model = self._build_model().to(self.device)
 
     def _create_dir(self):
         self.path_weight = Path(self.opt.save_dir) / self.opt.model /  'weights'
@@ -101,8 +103,7 @@ class AbstractAlgorithm:
         optimizer = self._get_optimizer()
         # scheduler = self._get_scheduler(optimizer=optimizer)
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model.to(device)
+        
         # early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
         # train_loader = self._get_loader(type='train')
         # val_loader = self._get_loader(type='val')
@@ -110,38 +111,57 @@ class AbstractAlgorithm:
         # val_loader = provider(self.opt, flag='val')
         # self.time_used = time.time() - start
 
-        from rich.table import Table
-        from rich.console import Console
-        console = Console()
-        table = Table(show_header=True, header_style="bold magenta")
-        table.add_column("Epoch", style="dim", width=12)
-        table.add_column("Average Loss", justify="right")
-
-        with progress_bar() as progress:
-            samples = len(train_loader)
-            overall_task = progress.add_task("[green]Epochs", total=self.opt.epochs)
-            subtask = progress.add_task("[red]Step", total=samples)
-            for _ in range(self.opt.epochs):
-                running_loss = 0.0
-                for batch_x, batch_y in train_loader:
-                    optimizer.zero_grad()
-                    batch_x, batch_y = batch_x.float().to(device), batch_y.float().to(device)
-                    batch_x = batch_x.permute(0, 2, 1)
-
-                    outputs = self.model(batch_x)
-                    dims = 0
-                    
-                    outputs = outputs[:, -self.opt.prediction_length:, dims:]
-                    batch_y = batch_y[:, -self.opt.prediction_length:, dims:]
-
-                    loss = criterion(outputs, batch_y)
-                    running_loss += loss.item()
-                    loss.backward()
-                    optimizer.step()
-                    progress.update(subtask, advance=1, description=f'[red]Step   | loss: {loss.item():.4f}')
-                progress.reset(subtask, total=samples)
-                progress.update(overall_task, advance=1, description=f'[green]Epochs | loss: {running_loss / samples:.4f}')
         
+        from rich.layout import Layout
+        from rich.live import Live
+        layout = Layout()
+        progress = progress_bar()
+        tab = table(columns=['Epoch', 'Loss', 'Time'])
+
+        layout.split(
+            Layout(name="upper", size=3),
+            Layout(name="lower")
+        )
+        layout["upper"].update(progress)
+        layout["lower"].update(tab)
+
+        with Live(layout, refresh_per_second=4):
+            samples = len(train_loader)
+            overall_task = progress.add_task("[green]Epoch", total=self.opt.epochs)
+            subtask = progress.add_task("[red]Batch", total=samples)
+            
+            for epoch in range(self.opt.epochs):
+                progress.reset(subtask, total=samples)
+                progress, running_loss, t = self.train_epoch(train_loader=train_loader, 
+                                                             optimizer=optimizer, 
+                                                             criterion=criterion, 
+                                                             progress=progress, 
+                                                             subtask=subtask)
+                average_loss = running_loss.sum() / samples
+                progress.update(overall_task, advance=1, description=f'[green]Epoch | loss: {average_loss:.4f}')
+                tab.add_row(f"{epoch + 1}", f"{average_loss:.4f}", f"{t:.4f}")
+    
+    def train_epoch(self, train_loader, optimizer, criterion, progress, subtask):
+        running_loss = []
+        start = time.time()
+        for batch_x, batch_y in train_loader:
+            optimizer.zero_grad()
+            batch_x, batch_y = batch_x.float().to(self.device), batch_y.float().to(self.device)
+            batch_x = batch_x.permute(0, 2, 1)
+
+            outputs = self.model(batch_x)
+            dims = 0
+            
+            outputs = outputs[:, -self.opt.prediction_length:, dims:]
+            batch_y = batch_y[:, -self.opt.prediction_length:, dims:]
+
+            loss = criterion(outputs, batch_y)
+            running_loss.append(loss.item())
+            loss.backward()
+            optimizer.step()
+            progress.update(subtask, advance=1, description=f'[red]Batch | loss: {loss.item():.4f}')
+        return progress, np.array(running_loss), time.time()-start
+
     def evaluate(self):
         self.model.eval()  # Set the model to evaluation mode
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

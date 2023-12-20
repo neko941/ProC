@@ -7,7 +7,8 @@ from rich.progress import TextColumn
 from rich.progress import TimeElapsedColumn
 from rich.progress import MofNCompleteColumn
 from rich.progress import TimeRemainingColumn
-
+from rich.table import Table
+from rich import box as rbox
 # def save_plot(filename, data, xlabel=None, ylabel=None):
 #     fig, ax = plt.subplots()
 #     for datum in data: ax.plot(*datum['data'], color=datum['color'], label=datum['label'])
@@ -28,3 +29,9 @@ def progress_bar():
                     TimeRemainingColumn(),
                     TextColumn("•Total"),
                     TimeElapsedColumn())
+
+def table(columns):
+    table = Table(title="[cyan]Results", show_header=True, header_style="bold magenta", box=rbox.ROUNDED, show_lines=True)
+    [table.add_column(f'[green]{name}', justify='center') for name in columns]
+
+    return table
