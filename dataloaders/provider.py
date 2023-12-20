@@ -6,7 +6,7 @@ def provider(args, flag):
     print("Loading dataset...")
 
     dataset = GeneralDataset(
-        root_path='./datasets',
+        root_path='./datasets/weather',
         data_path='weather.csv',
         # root_path=args.root_path,
         # data_path=args.data_path,
