@@ -24,7 +24,16 @@ def parse_opt(ROOT, known=False):
     parser.add_argument('--loader', type=str, choices=['SalinityDSLoader'], default='SalinityDSLoader', help='loader')
     parser.add_argument('--models', 
                         action='append', 
-                        choices=['VanillaLSTM', 'VanillaRNN'], 
+                        choices=['VanillaLSTM', 'VanillaRNN', 'PatchTST'], 
                         required=True)
+    parser.add_argument('--warmup_steps', type=int, default=0, help='warmup steps for learning rate scheduler')
+    parser.add_argument('--warmup_ratio', type=float, default=0.1, help='warmup ratio for learning rate scheduler')
+
+    # PatchTST
+    parser.add_argument('--enc_in', type=int, default=21, help='')
+    parser.add_argument('--label_length', type=int, default=0, help='')
+    parser.add_argument('--date', type=str, default='date', help='')
+    parser.add_argument('--target', type=str, default='OT', help='')
+    parser.add_argument('--num_workers', type=int, default=0, help='')
 
     return parser.parse_known_args()[0] if known else parser.parse_args()

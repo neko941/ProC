@@ -2,14 +2,17 @@ import torch
 import torch.nn as nn
 from torch import optim
 from models.architectures.LSTM import VanillaLSTM
-from configs.model_configs import VanillaLSTMConfig
+from models.architectures.PatchTST import PatchTST
+from configs.model_configs import VanillaLSTMConfig, PatchTSTConfig
 from torch.utils.data import Dataset
 import numpy as np
 from pathlib import Path
 import time
 import random
+import math
 from callbacks.early_stopping import EarlyStopping
 from dataloaders.salinity import SalinityDSLoader
+from dataloaders.provider import provider
 from sklearn.metrics import r2_score
 
 class AbstractAlgorithm:
@@ -35,9 +38,11 @@ class AbstractAlgorithm:
     def _build_model(self):
         model_dict = {
             'VanillaLSTM': VanillaLSTM,
+            'PatchTST': PatchTST,
         }
         config_dict = {
             'VanillaLSTM': VanillaLSTMConfig,
+            'PatchTST': PatchTSTConfig,
         }
         configs = config_dict[self.opt.model]()
         model = model_dict[self.opt.model](self.opt, configs)
@@ -57,10 +62,16 @@ class AbstractAlgorithm:
         }
         return optimizer_dict[self.opt.optimizer](self.model.parameters(),lr=self.opt.learning_rate)
 
-    def _get_scheduler(self, optimizer):
+    def _get_scheduler(self, optimizer, training_steps=-1):
         scheduler_dict = {
             "StepLR": optim.lr_scheduler.StepLR,
+            "LambdaLR": optim.lr_scheduler.LambdaLR,
         }
+        if self.opt.scheduler == 'LambdaLR':
+            warmup_steps = self.opt.warmup_steps if self.opt.warmup_steps > 0 else math.ceil(self.opt.warmup_ratio * training_steps)
+            lr_lambda = lambda step: 1.0 if step >= warmup_steps else float(step) / float(max(1, warmup_steps))
+            return scheduler_dict[self.opt.scheduler](optimizer, lr_lambda=lr_lambda)
+
         return scheduler_dict[self.opt.scheduler](optimizer, step_size=10, gamma=0.1)
     
     def _get_loader(self, type='train'):
@@ -92,44 +103,50 @@ class AbstractAlgorithm:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(device)
         early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
-        train_loader = self._get_loader(type='train')
-        val_loader = self._get_loader(type='val')
+        # train_loader = self._get_loader(type='train')
+        # val_loader = self._get_loader(type='val')
+        train_loader = provider(self.opt, flag='train')
+        val_loader = provider(self.opt, flag='val')
         self.time_used = time.time() - start
 
         for epoch in range(self.opt.epochs):
             for i, (batch_x, batch_y) in enumerate(train_loader):
                 optimizer.zero_grad()
-                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                batch_x, batch_y = batch_x.float().to(device), batch_y.float().to(device)
                 batch_x = batch_x.permute(0, 2, 1)
 
                 outputs = self.model(batch_x)
-                dims = -1
-                outputs = outputs[:, dims:, :].squeeze()
+                dims = 0
+                
+                outputs = outputs[:, -self.opt.prediction_length:, dims:]
+                batch_y = batch_y[:, -self.opt.prediction_length:, dims:]
 
                 loss = criterion(outputs, batch_y)
                 loss.backward()
                 optimizer.step()
-                if i % 100 == 0:
-                    print(f'Epoch [{epoch+1}/{self.opt.epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}')
-
+                print(f'Epoch [{epoch+1}/{self.opt.epochs}], Step [{i+1}/{len(train_loader)}], Loss: {loss.item():.4f}')
+            print(f'Epoch [{epoch+1}/{self.opt.epochs}], Loss: {loss.item():.4f}')
 
     def evaluate(self):
         self.model.eval()  # Set the model to evaluation mode
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        test_loader = self._get_loader(type='test')
+        # test_loader = self._get_loader(type='test')
+        test_loader = provider(self.opt, flag='test')
         total_loss = 0.0
         all_predictions = []
         all_targets = []
 
         with torch.no_grad():
             for batch_x, batch_y in test_loader:
-                batch_x, batch_y = batch_x.to(device), batch_y.to(device)
+                batch_x, batch_y = batch_x.float().to(device), batch_y.float().to(device)
                 batch_x = batch_x.permute(0, 2, 1)
 
                 outputs = self.model(batch_x)
-                dims = -1
-                outputs = outputs[:, dims:, :].squeeze()
+                dims = 0
+                
+                outputs = outputs[:, -self.opt.prediction_length:, dims:]
+                batch_y = batch_y[:, -self.opt.prediction_length:, dims:]
 
                 criterion = self._get_criterion()
                 loss = criterion(outputs, batch_y)
@@ -141,8 +158,11 @@ class AbstractAlgorithm:
         average_loss = total_loss / len(test_loader)
         print(f'Loss: {average_loss:.4f}')
 
-        all_predictions = np.concatenate(all_predictions, axis=0)
-        all_targets = np.concatenate(all_targets, axis=0)
+        all_predictions = np.array(all_predictions)
+        all_targets = np.array(all_targets)
+        
+        all_predictions = np.reshape(all_predictions, (all_predictions.shape[0] * all_predictions.shape[1], -1))
+        all_targets = np.reshape(all_targets, (all_targets.shape[0] * all_targets.shape[1], -1))
 
         r2 = r2_score(all_targets, all_predictions)
         print(f'R-squared (R2) Score: {r2:.4f}')
