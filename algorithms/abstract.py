@@ -97,21 +97,15 @@ class AbstractAlgorithm:
         print(f"Random seed set as {self.opt.seed}")
     
     def train(self):
-        # start = time.time()
-
         criterion = self._get_criterion()
         optimizer = self._get_optimizer()
-        # scheduler = self._get_scheduler(optimizer=optimizer)
+        scheduler = self._get_scheduler(optimizer=optimizer)
 
         
         early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
-        # train_loader = self._get_loader(type='train')
-        # val_loader = self._get_loader(type='val')
         train_loader = provider(self.opt, flag='train')
         val_loader = provider(self.opt, flag='val')
-        # self.time_used = time.time() - start
 
-        
         from rich.layout import Layout
         from rich.live import Live
         layout = Layout()
@@ -132,11 +126,27 @@ class AbstractAlgorithm:
             
             for epoch in range(self.opt.epochs):
                 progress.reset(subtask, total=samples)
-                progress, running_loss, t = self.train_epoch(train_loader=train_loader, 
-                                                             optimizer=optimizer, 
-                                                             criterion=criterion, 
-                                                             progress=progress, 
-                                                             subtask=subtask)
+                running_loss = []
+                start_inner = time.time()
+                for batch_x, batch_y in train_loader:
+                    optimizer.zero_grad()
+                    batch_x, batch_y = batch_x.float().to(self.device), batch_y.float().to(self.device)
+                    batch_x = batch_x.permute(0, 2, 1)
+
+                    outputs = self.model(batch_x)
+                    dims = 0
+                    
+                    outputs = outputs[:, -self.opt.prediction_length:, dims:]
+                    batch_y = batch_y[:, -self.opt.prediction_length:, dims:]
+
+                    loss = criterion(outputs, batch_y)
+                    running_loss.append(loss.item())
+                    loss.backward()
+                    optimizer.step()
+                    scheduler.step()
+                    t = time.time() - start_inner
+                    progress.update(subtask, advance=1, description=f'[red]Batch | loss: {loss.item():.4f}')
+                running_loss = np.array(running_loss)
                 average_loss = running_loss.sum() / samples
                 progress.update(overall_task, advance=1, description=f'[green]Epoch | loss: {average_loss:.4f}')
                 val_loss = self.evaluate(val_loader)[0]
@@ -153,27 +163,11 @@ class AbstractAlgorithm:
                     print("Loading the best weights...")
                     self.model.load_state_dict(early_stopping.best_weight)
                     break
+
     
-    def train_epoch(self, train_loader, optimizer, criterion, progress, subtask):
-        running_loss = []
-        start = time.time()
-        for batch_x, batch_y in train_loader:
-            optimizer.zero_grad()
-            batch_x, batch_y = batch_x.float().to(self.device), batch_y.float().to(self.device)
-            batch_x = batch_x.permute(0, 2, 1)
-
-            outputs = self.model(batch_x)
-            dims = 0
-            
-            outputs = outputs[:, -self.opt.prediction_length:, dims:]
-            batch_y = batch_y[:, -self.opt.prediction_length:, dims:]
-
-            loss = criterion(outputs, batch_y)
-            running_loss.append(loss.item())
-            loss.backward()
-            optimizer.step()
-            progress.update(subtask, advance=1, description=f'[red]Batch | loss: {loss.item():.4f}')
-        return progress, np.array(running_loss), time.time()-start
+    # def train_epoch(self, train_loader, optimizer, criterion, progress, subtask):
+        
+    #     return progress, np.array(running_loss), time.time()-start
 
     def evaluate(self, loader=None):
         self.model.eval()  # Set the model to evaluation mode
