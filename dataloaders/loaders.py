@@ -53,7 +53,7 @@ class GeneralDataset(Dataset):
         df_len = len(df_raw)
 
         num_train = int(df_len * 0.7)
-        num_val = int(df_len * 0.2)
+        num_val = int(df_len * 0.1)
         num_test = df_len - num_train - num_val
 
         border1s = [0, num_train - self.seq_len, df_len - num_test - self.seq_len]

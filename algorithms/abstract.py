@@ -1,21 +1,25 @@
 import torch
 import torch.nn as nn
 from torch import optim
-from models.architectures.LSTM import VanillaLSTM
-from models.architectures.PatchTST import PatchTST
-from configs.model_configs import VanillaLSTMConfig, PatchTSTConfig
-from torch.utils.data import Dataset
 import numpy as np
 from pathlib import Path
 import time
 import random
 import math
+from rich.layout import Layout
+from rich.live import Live
+
+
 from callbacks.early_stopping import EarlyStopping
 from dataloaders.salinity import SalinityDSLoader
 from dataloaders.provider import provider
-from sklearn.metrics import r2_score
 from utils.visuals import progress_bar
 from utils.visuals import table
+from utils.metrics import metric
+
+from models.architectures.LSTM import VanillaLSTM
+from models.architectures.PatchTST import PatchTST
+from configs.model_configs import VanillaLSTMConfig, PatchTSTConfig
 
 class AbstractAlgorithm:
     def __init__(self, opt):
@@ -101,13 +105,9 @@ class AbstractAlgorithm:
         optimizer = self._get_optimizer()
         scheduler = self._get_scheduler(optimizer=optimizer)
 
-        
-        early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
+        early_stopping = EarlyStopping(patience=self.opt.patience, verbose=False)
         train_loader = provider(self.opt, flag='train')
-        val_loader = provider(self.opt, flag='val')
 
-        from rich.layout import Layout
-        from rich.live import Live
         layout = Layout()
         progress = progress_bar()
         tab = table(columns=['Epoch', 'Loss', 'Val Loss', 'Patience', 'Time'])
@@ -146,10 +146,12 @@ class AbstractAlgorithm:
                     scheduler.step()
                     t = time.time() - start_inner
                     progress.update(subtask, advance=1, description=f'[red]Batch | loss: {loss.item():.4f}')
+
                 running_loss = np.array(running_loss)
                 average_loss = running_loss.sum() / samples
                 progress.update(overall_task, advance=1, description=f'[green]Epoch | loss: {average_loss:.4f}')
-                val_loss = self.evaluate(val_loader)[0]
+
+                val_loss = self.evaluate()[0]
                 early_stopping(val_loss, weight=self.model.state_dict())
                 tab.add_row(f"{epoch + 1}", 
                             f"{average_loss:.4f}", 
@@ -169,14 +171,16 @@ class AbstractAlgorithm:
         
     #     return progress, np.array(running_loss), time.time()-start
 
-    def evaluate(self, loader=None):
+    def evaluate(self, flag='val'):
         self.model.eval()  # Set the model to evaluation mode
 
         # test_loader = self._get_loader(type='test')
-        if loader is None: loader = provider(self.opt, flag='test')
+        if flag == 'test': loader = provider(self.opt, flag=flag)
+        else: loader = provider(self.opt, flag=flag)
+        
         total_loss = 0.0
-        all_predictions = []
-        all_targets = []
+        predictions = []
+        targets = []
 
         with torch.no_grad():
             for batch_x, batch_y in loader:
@@ -193,21 +197,17 @@ class AbstractAlgorithm:
                 loss = criterion(outputs, batch_y)
                 total_loss += loss.item()
 
-                all_predictions.append(outputs.cpu().numpy())
-                all_targets.append(batch_y.cpu().numpy())
+                predictions.append(outputs.cpu().numpy())
+                targets.append(batch_y.cpu().numpy())
 
         average_loss = total_loss / len(loader)
         print(f'Loss: {average_loss:.4f}')
 
-        all_predictions = np.array(all_predictions)
-        all_targets = np.array(all_targets)
+        predictions = np.array(predictions)
+        targets = np.array(targets)
         
-        all_predictions = np.reshape(all_predictions, (all_predictions.shape[0] * all_predictions.shape[1], -1))
-        all_targets = np.reshape(all_targets, (all_targets.shape[0] * all_targets.shape[1], -1))
-
-        r2 = r2_score(all_targets, all_predictions)
-        print(f'R-squared (R2) Score: {r2:.4f}')
-
+        mae, mse, rmse, mape, mspe, rse, corr, r2 = metric(predictions, targets)
+        
         return average_loss, r2
 
 
