@@ -104,11 +104,11 @@ class AbstractAlgorithm:
         # scheduler = self._get_scheduler(optimizer=optimizer)
 
         
-        # early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
+        early_stopping = EarlyStopping(patience=self.opt.patience, verbose=True)
         # train_loader = self._get_loader(type='train')
         # val_loader = self._get_loader(type='val')
         train_loader = provider(self.opt, flag='train')
-        # val_loader = provider(self.opt, flag='val')
+        val_loader = provider(self.opt, flag='val')
         # self.time_used = time.time() - start
 
         
@@ -116,7 +116,7 @@ class AbstractAlgorithm:
         from rich.live import Live
         layout = Layout()
         progress = progress_bar()
-        tab = table(columns=['Epoch', 'Loss', 'Time'])
+        tab = table(columns=['Epoch', 'Loss', 'Val Loss', 'Patience', 'Time'])
 
         layout.split(
             Layout(name="upper", size=3),
@@ -125,7 +125,7 @@ class AbstractAlgorithm:
         layout["upper"].update(progress)
         layout["lower"].update(tab)
 
-        with Live(layout, refresh_per_second=4):
+        with Live(layout, refresh_per_second=4, vertical_overflow='visible'):
             samples = len(train_loader)
             overall_task = progress.add_task("[green]Epoch", total=self.opt.epochs)
             subtask = progress.add_task("[red]Batch", total=samples)
@@ -139,7 +139,20 @@ class AbstractAlgorithm:
                                                              subtask=subtask)
                 average_loss = running_loss.sum() / samples
                 progress.update(overall_task, advance=1, description=f'[green]Epoch | loss: {average_loss:.4f}')
-                tab.add_row(f"{epoch + 1}", f"{average_loss:.4f}", f"{t:.4f}")
+                val_loss = self.evaluate(val_loader)[0]
+                early_stopping(val_loss, weight=self.model.state_dict())
+                tab.add_row(f"{epoch + 1}", 
+                            f"{average_loss:.4f}", 
+                            f"{val_loss:.4f}", 
+                            f"{self.opt.patience-early_stopping.counter}", 
+                            f"{t:.4f}")
+
+                # Check for early stopping
+                if early_stopping.early_stop:
+                    print("Early stopping triggered")
+                    print("Loading the best weights...")
+                    self.model.load_state_dict(early_stopping.best_weight)
+                    break
     
     def train_epoch(self, train_loader, optimizer, criterion, progress, subtask):
         running_loss = []
@@ -162,19 +175,18 @@ class AbstractAlgorithm:
             progress.update(subtask, advance=1, description=f'[red]Batch | loss: {loss.item():.4f}')
         return progress, np.array(running_loss), time.time()-start
 
-    def evaluate(self):
+    def evaluate(self, loader=None):
         self.model.eval()  # Set the model to evaluation mode
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
         # test_loader = self._get_loader(type='test')
-        test_loader = provider(self.opt, flag='test')
+        if loader is None: loader = provider(self.opt, flag='test')
         total_loss = 0.0
         all_predictions = []
         all_targets = []
 
         with torch.no_grad():
-            for batch_x, batch_y in test_loader:
-                batch_x, batch_y = batch_x.float().to(device), batch_y.float().to(device)
+            for batch_x, batch_y in loader:
+                batch_x, batch_y = batch_x.float().to(self.device), batch_y.float().to(self.device)
                 batch_x = batch_x.permute(0, 2, 1)
 
                 outputs = self.model(batch_x)
@@ -190,7 +202,7 @@ class AbstractAlgorithm:
                 all_predictions.append(outputs.cpu().numpy())
                 all_targets.append(batch_y.cpu().numpy())
 
-        average_loss = total_loss / len(test_loader)
+        average_loss = total_loss / len(loader)
         print(f'Loss: {average_loss:.4f}')
 
         all_predictions = np.array(all_predictions)
