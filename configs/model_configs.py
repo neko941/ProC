@@ -6,6 +6,7 @@ class VanillaLSTMConfig():
 class DLinearConfig():
     def __init__(self):
         self.individual = False
+        self.weight_path = None
 
 class PatchTSTConfig():
     def __init__(self):

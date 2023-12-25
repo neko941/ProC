@@ -35,12 +35,12 @@ class series_decomp(nn.Module):
         res = x - moving_mean
         return res, moving_mean
 
-class Model(nn.Module):
+class DLinear(nn.Module):
     """
     Decomposition-Linear
     """
     def __init__(self, args, configs):
-        super(Model, self).__init__()
+        super(DLinear, self).__init__()
         self.args = args
         
         self.seq_len = args.sequence_length
