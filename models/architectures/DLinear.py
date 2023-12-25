@@ -46,6 +46,7 @@ class DLinear(nn.Module):
         self.seq_len = args.sequence_length
         self.pred_len = args.prediction_length
         self.channels = args.enc_in
+        # print(f'{self.channels = }')
         # Decompsition Kernel Size
         kernel_size = 25
         self.decompsition = series_decomp(kernel_size)

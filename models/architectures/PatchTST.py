@@ -54,7 +54,7 @@ class PatchTST(nn.Module):
         self.head = FlattenHead(self.head_nf, self.pred_len, head_dropout=self.head_dropout)
             
     def forward(self, x: Tensor) -> Tensor:    
-        z = z.permute(0, 2, 1) # batch, channels, length                                             # x: [bs x nvars x seq_len]):
+        x = x.permute(0, 2, 1) # batch, channels, length                                             # x: [bs x nvars x seq_len]):
         if self.padding_patch == 'end':
             z = self.padding_patch_layer(x)
 

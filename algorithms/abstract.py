@@ -191,7 +191,7 @@ class AbstractAlgorithm:
         with torch.no_grad():
             for batch_x, batch_y in loader:
                 batch_x, batch_y = batch_x.float().to(self.device), batch_y.float().to(self.device)
-                batch_x = batch_x.permute(0, 2, 1)
+                # batch_x = batch_x.permute(0, 2, 1)
 
                 outputs = self.model(batch_x)
                 dims = 0
