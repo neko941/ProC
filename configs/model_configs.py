@@ -3,6 +3,10 @@ class VanillaLSTMConfig():
         self.units = [64, 64]
         self.weight_path = None
         
+class DLinearConfig():
+    def __init__(self):
+        self.individual = False
+
 class PatchTSTConfig():
     def __init__(self):
         self.enc_layers = 3

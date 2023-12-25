@@ -19,7 +19,8 @@ from utils.metrics import metric
 
 from models.architectures.LSTM import VanillaLSTM
 from models.architectures.PatchTST import PatchTST
-from configs.model_configs import VanillaLSTMConfig, PatchTSTConfig
+from models.architectures.DLinear import DLinear
+from configs.model_configs import *
 
 class AbstractAlgorithm:
     def __init__(self, opt):
@@ -46,10 +47,12 @@ class AbstractAlgorithm:
         model_dict = {
             'VanillaLSTM': VanillaLSTM,
             'PatchTST': PatchTST,
+            'DLinear': DLinear,
         }
         config_dict = {
             'VanillaLSTM': VanillaLSTMConfig,
             'PatchTST': PatchTSTConfig,
+            'DLinear': DLinearConfig
         }
         configs = config_dict[self.opt.model]()
         model = model_dict[self.opt.model](self.opt, configs)
@@ -69,17 +72,20 @@ class AbstractAlgorithm:
         }
         return optimizer_dict[self.opt.optimizer](self.model.parameters(),lr=self.opt.learning_rate)
 
-    def _get_scheduler(self, optimizer, training_steps=-1):
+    def _get_scheduler(self, optimizer, training_steps=-1, steps_per_epoch=10, ):
         scheduler_dict = {
             "StepLR": optim.lr_scheduler.StepLR,
             "LambdaLR": optim.lr_scheduler.LambdaLR,
+            "OneCycleLR": optim.lr_scheduler.OneCycleLR,
         }
         if self.opt.scheduler == 'LambdaLR':
             warmup_steps = self.opt.warmup_steps if self.opt.warmup_steps > 0 else math.ceil(self.opt.warmup_ratio * training_steps)
             lr_lambda = lambda step: 1.0 if step >= warmup_steps else float(step) / float(max(1, warmup_steps))
             return scheduler_dict[self.opt.scheduler](optimizer, lr_lambda=lr_lambda)
-
-        return scheduler_dict[self.opt.scheduler](optimizer, step_size=10, gamma=0.1)
+        elif self.opt.scheduler == 'OneCycleLR':
+            return scheduler_dict[self.opt.scheduler](optimizer, steps_per_epoch=steps_per_epoch, pct_start=self.opt.pct_start, epochs=self.opt.epochs, max_lr=self.opt.learning_rate)
+        else:
+            return scheduler_dict[self.opt.scheduler](optimizer, step_size=10, gamma=0.1)
     
     def _get_loader(self, type='train'):
         loader_dict = {
@@ -103,10 +109,11 @@ class AbstractAlgorithm:
     def train(self):
         criterion = self._get_criterion()
         optimizer = self._get_optimizer()
-        scheduler = self._get_scheduler(optimizer=optimizer)
 
         early_stopping = EarlyStopping(patience=self.opt.patience, verbose=False)
         train_loader = provider(self.opt, flag='train')
+        samples = len(train_loader)
+        scheduler = self._get_scheduler(optimizer=optimizer, steps_per_epoch=samples)
 
         layout = Layout()
         progress = progress_bar()
@@ -120,7 +127,6 @@ class AbstractAlgorithm:
         layout["lower"].update(tab)
 
         with Live(layout, refresh_per_second=4, vertical_overflow='visible'):
-            samples = len(train_loader)
             overall_task = progress.add_task("[green]Epoch", total=self.opt.epochs)
             subtask = progress.add_task("[red]Batch", total=samples)
             
@@ -131,7 +137,7 @@ class AbstractAlgorithm:
                 for batch_x, batch_y in train_loader:
                     optimizer.zero_grad()
                     batch_x, batch_y = batch_x.float().to(self.device), batch_y.float().to(self.device)
-                    batch_x = batch_x.permute(0, 2, 1)
+                    # batch_x = batch_x.permute(0, 2, 1) # batch, channels, length
 
                     outputs = self.model(batch_x)
                     dims = 0
@@ -162,8 +168,8 @@ class AbstractAlgorithm:
                 # Check for early stopping
                 if early_stopping.early_stop:
                     print("Early stopping triggered")
-                    print("Loading the best weights...")
-                    self.model.load_state_dict(early_stopping.best_weight)
+                    # print("Loading the best weights...")
+                    # self.model.load_state_dict(early_stopping.best_weight)
                     break
 
     
