@@ -168,8 +168,8 @@ class AbstractAlgorithm:
                 # Check for early stopping
                 if early_stopping.early_stop:
                     print("Early stopping triggered")
-                    # print("Loading the best weights...")
-                    # self.model.load_state_dict(early_stopping.best_weight)
+                    print("Loading the best weights...")
+                    self.model.load_state_dict(early_stopping.best_weight)
                     break
 
     
