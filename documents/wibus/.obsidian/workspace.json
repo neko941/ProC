@@ -13,7 +13,7 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Welcome.md",
+                "file": "create a link.md",
                 "mode": "source",
                 "source": false
               }
@@ -99,7 +99,7 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Welcome.md",
+                "file": "create a link.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -116,7 +116,7 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Welcome.md",
+                "file": "create a link.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               }
@@ -139,7 +139,7 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Welcome.md"
+                "file": "create a link.md"
               }
             }
           }
@@ -160,8 +160,10 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "079168f3f469bb4b",
+  "active": "9933730d6f5d0d56",
   "lastOpenFiles": [
-    "Welcome.md"
+    "Welcome.md",
+    "Untitled.canvas",
+    "create a link.md"
   ]
 }
