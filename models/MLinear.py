@@ -33,14 +33,17 @@ class Model(nn.Module):
         self.d_model = d_model
         num_linear_transforms = 3
         
-        self.linears = nn.ModuleList([nn.Linear(seq_len, d_model) for _ in range(num_linear_transforms)])
+        self.linears = nn.ModuleList([nn.Linear(self.seq_len, self.pred_len) for _ in range(num_linear_transforms)])
         self.efficient_attention = EfficientAttention(d_model)
-        self.mix = nn.Linear((num_linear_transforms + 1) * d_model, pred_len)
+        self.mix = nn.Linear((num_linear_transforms + 1) * d_model, self.pred_len)
         
     def forward(self, x):
+        # print(f'{x.shape = }\n\n\n\n\n\n\n\n\n\n\n')
         batch_size = x.shape[0]
-        
+        x = x.permute(0,2,1)
         parallel_transforms = [linear(x) for linear in self.linears]
+        # print(self.linears[0](x))
+        # exit()
         
         # Concatenate all parallel transforms along the last dimension
         concatenated = torch.cat(parallel_transforms, dim=-1)
