@@ -2,4 +2,10 @@ numpy
 matplotlib
 pandas
 scikit-learn
-torch==1.11.0
+# torch==1.11.0
+
+# mamba
+causal-conv1d>=1.2.0
+einops
+packaging
+mamba-ssm 

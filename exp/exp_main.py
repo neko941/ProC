@@ -169,7 +169,7 @@ class Exp_Main(Exp_Basic):
                         loss = criterion(outputs, batch_y)
                         train_loss.append(loss.item())
                 else:
-                    if 'Linear' in self.args.model or 'TST' in self.args.model:
+                    if 'Linear' in self.args.model or 'TST' in self.args.model or 'Mamba' in self.args.model:
                             outputs = self.model(batch_x)
                     else:
                         if self.args.output_attention:

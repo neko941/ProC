@@ -1,11 +1,10 @@
-import torch
 import torch.nn as nn
-import torch.nn.functional as F
-import numpy as np
+from layers.TSMamaba_layers import MixerModel, _init_weights
+from functools import partial
 
 class Model(nn.Module):
     def __init__(self, configs):
-        super(TSMamba, self).__init__()
+        super(Model, self).__init__()
         self.seq_len = configs.seq_len
         self.pred_len = configs.pred_len
 
