@@ -5,7 +5,7 @@ scikit-learn
 # torch==1.11.0
 
 # mamba
-causal-conv1d>=1.2.0
-einops
+causal-conv1d==1.1.0 
+einops==0.7.0
 packaging
 mamba-ssm 
