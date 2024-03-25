@@ -1,5 +1,5 @@
 # DeLUR
-## Update System
+<!-- ## Update System
 ```
 sudo apt-get update
 sudo apt-get upgrade 
@@ -67,28 +67,30 @@ wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/
 sudo dpkg -i cuda-keyring_1.1-1_all.deb
 sudo apt-get update
 sudo apt-get -y install cudnn
-```
+``` -->
 
 
 ## Virtual Environment
+### Windows
 ```bash
 pip install virtualenv
 python -m virtualenv venv --python=3.10.10
 .\venv\Scripts\activate
 ```
+### Linux
 ```
 source venv/bin/activate
 ```
 ## Requirements
 ```bash
-pip install --upgrade pip setuptools wheel
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 pip install -r requirements.txt
 ```
-```
+<!-- ```
+pip install --upgrade pip setuptools wheel
 https://github.com/Dao-AILab/causal-conv1d
 cd causal-conv1d
 export FORCE_CUDA="1"
 MAX_JOBS=2 CAUSAL_CONV1D_FORCE_BUILD="TRUE" python setup.py bdist_wheel --dist-dir=dist
 python setup.py install
-```
+``` -->
