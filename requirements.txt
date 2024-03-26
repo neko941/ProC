@@ -1,8 +1,8 @@
 # mamba
-packaging
-mamba-ssm 
-causal-conv1d
-einops
+# packaging
+# mamba-ssm 
+# causal-conv1d
+# einops
 
 numpy
 matplotlib
