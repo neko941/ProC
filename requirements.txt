@@ -2,10 +2,10 @@
 # packaging
 # mamba-ssm 
 # causal-conv1d
-# einops
 
 numpy
 matplotlib
 pandas
 scikit-learn
+einops
 # torch==1.11.0
