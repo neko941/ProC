@@ -7,5 +7,5 @@ numpy
 matplotlib
 pandas
 scikit-learn
-einops
+# einops
 # torch==1.11.0

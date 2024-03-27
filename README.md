@@ -69,7 +69,15 @@ sudo apt-get update
 sudo apt-get -y install cudnn
 ``` -->
 
-
+```
+python -c 'import torch; print(torch.version.cuda)'
+nvcc --version
+```
+should be the same version
+Check Pytorch 
+```
+python -c 'import torch; print(f"{torch.cuda.is_available() = }"); print(f"{torch.cuda.device_count() = }"); print(f"{torch.cuda.current_device() = }"); [print(f"Device {i}: {torch.cuda.get_device_name(i)}") for i in range(torch.cuda.device_count())]'
+```
 ## Virtual Environment
 ### Windows
 ```bash
@@ -83,7 +91,8 @@ source venv/bin/activate
 ```
 ## Requirements
 ```bash
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+# pip3 install torch==1.12 torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
+pip install torch==2.1.2 torchvision==0.16.2 torchaudio==2.1.2 --index-url https://download.pytorch.org/whl/cu118
 pip install -r requirements.txt
 ```
 <!-- ```

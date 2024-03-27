@@ -7,8 +7,8 @@ from models import Informer, \
                    Linear, \
                    NLinear, \
                    PatchTST, \
-                   MLinear, \
-                   TSMamba
+                   MLinear \
+                #    TSMamba
 from utils.tools import EarlyStopping, adjust_learning_rate, visual, test_params_flop
 from utils.metrics import metric
 
@@ -41,7 +41,7 @@ class Exp_Main(Exp_Basic):
             'Linear': Linear,
             'PatchTST': PatchTST,
             'MLinear': MLinear,
-            'TSMamba': TSMamba
+            # 'TSMamba': TSMamba
         }
         model = model_dict[self.args.model].Model(self.args).float()
 
