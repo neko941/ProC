@@ -1,5 +1,6 @@
 venv
-runs
+runs/*
+!runs/logs/
 __pycache__
 checkpoints
 results

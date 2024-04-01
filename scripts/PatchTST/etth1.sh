@@ -1,9 +1,9 @@
-if [ ! -d "./logs" ]; then
-    mkdir ./logs
+if [ ! -d "./runs" ]; then
+    mkdir ./runs
 fi
 
-if [ ! -d "./logs/LongForecasting" ]; then
-    mkdir ./logs/LongForecasting
+if [ ! -d "./runs/logs" ]; then
+    mkdir ./runs/logs
 fi
 seq_len=336
 model_name=PatchTST
@@ -40,5 +40,5 @@ do
       --stride 8\
       --des 'Exp' \
       --train_epochs 100\
-      --itr 1 --batch_size 128 --learning_rate 0.0001 >logs/LongForecasting/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len'_'$random_seed.log 
+      --itr 1 --batch_size 128 --learning_rate 0.0001 >runs/logs/$model_name'_'$model_id_name'_'$seq_len'_'$pred_len'_'$random_seed.log 
 done
