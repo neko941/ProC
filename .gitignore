@@ -1,8 +1,1 @@
-venv
-runs/*
-!runs/logs/
 __pycache__
-checkpoints
-results
-test_results
-result.txt
