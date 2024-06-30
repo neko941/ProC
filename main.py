@@ -1,9 +1,10 @@
 import os
 import sys
 from utils import Options, SetSeed, BinanceDataset
-from models import Linear
+import polars as pl
 import torch
 from losses import Evaluator
+import glob
 
 FILE = os.path.abspath(__file__)
 ROOT = os.path.dirname(FILE)  # root directory
@@ -20,6 +21,8 @@ if __name__ == "__main__":
 
     for t in range(args.times):
         SetSeed(seed=args.seed+t).set()
+        path = os.path.join(args.save_path, str(t))
+        os.makedirs(path, exist_ok=True)
         model = getattr(__import__('models'), args.model)(configs=args).to(args.device)
         criterion = getattr(__import__('losses'), args.loss)()
         optimizer = getattr(__import__('optimizers'), args.optimizer)(model.parameters(), lr=args.lr)
@@ -61,3 +64,24 @@ if __name__ == "__main__":
             })
 
             print(history[-1])
+
+        pl.from_dicts(history).write_csv(os.path.join(path, 'history.csv'))
+
+    # Aggregate best metrics from all history files
+    all_best_metrics = []
+    for file_path in glob.glob(os.path.join(args.save_path, '**', 'history.csv'), recursive=True):
+        df = pl.read_csv(file_path)
+        best_metrics = {name: df[name].min() for name in evaluator.metrics}
+        all_best_metrics.append(best_metrics)
+
+    # Calculate mean and std for best metrics
+    all_best_metrics_df = pl.DataFrame(all_best_metrics)
+    summary_df = pl.DataFrame({
+        "metric": evaluator.metrics.keys(),
+        "mean": all_best_metrics_df.mean().row(0),
+        "std": all_best_metrics_df.std().row(0)
+    })
+
+    summary_df.write_csv(os.path.join(args.save_path, 'summary_metrics.csv'))
+
+    print(summary_df)
