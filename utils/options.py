@@ -8,6 +8,10 @@ from rich import box
 from rich.terminal_theme import MONOKAI
 from rich.console import Console
 
+LOSS = ['MAE', 'MSE']
+OPTIMZER = ['Adam', 'SGD']
+MODEL = ['Linear']
+
 class Options:
     def __init__(self, ROOT):
         self.ROOT = ROOT
@@ -20,7 +24,6 @@ class Options:
         parser.add_argument('--seed', type=int, default=941)
         parser.add_argument('--device', type=str, default="cuda", choices=["cpu", "cuda"])
         parser.add_argument('--device_id', type=str, default="0")
-        parser.add_argument('--epochs', type=int, default=2000, help='number of epochs to train the model')
 
         # save path
         parser.add_argument('--project', type=str, default=os.path.join(self.ROOT, 'runs'), help='project name')
@@ -34,6 +37,13 @@ class Options:
         parser.add_argument('--split_ratio', type=float, default=[0.7, 0.2, 0.1], action='append', help='train, val, test split ratio')
         parser.add_argument('--batch_size', type=int, default=64, help='batch size')
         parser.add_argument('--shuffle', action='store_true', help='shuffle dataset')
+
+        # training
+        parser.add_argument('--epochs', type=int, default=2000, help='number of epochs to train the model')
+        parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
+        parser.add_argument('--loss', type=str, default='MSE', choices=LOSS, help='loss function')
+        parser.add_argument('--optimizer', type=str, default='Adam', choices=OPTIMZER, help='optimizer')
+        parser.add_argument('--model', type=str, default='Linear', choices=MODEL, help='model name')
 
         self.args = parser.parse_args()
         return self
