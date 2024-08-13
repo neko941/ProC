@@ -7,10 +7,9 @@ from rich.table import Table
 from rich import box
 from rich.terminal_theme import MONOKAI
 from rich.console import Console
-
-LOSS = ['MAE', 'MSE']
-OPTIMZER = ['Adam', 'SGD']
-MODEL = ['Linear']
+from models import MODELS
+from losses import LOSSES
+from optimizers import OPTIMIZERS
 
 class Options:
     def __init__(self, ROOT):
@@ -41,9 +40,9 @@ class Options:
         # training
         parser.add_argument('--epochs', type=int, default=2000, help='number of epochs to train the model')
         parser.add_argument('--lr', type=float, default=1e-3, help='learning rate')
-        parser.add_argument('--loss', type=str, default='MSE', choices=LOSS, help='loss function')
-        parser.add_argument('--optimizer', type=str, default='Adam', choices=OPTIMZER, help='optimizer')
-        parser.add_argument('--model', type=str, default='Linear', choices=MODEL, help='model name')
+        parser.add_argument('--loss', type=str, default='MSE', choices=LOSSES, help='loss function')
+        parser.add_argument('--optimizer', type=str, default='Adam', choices=OPTIMIZERS, help='optimizer')
+        parser.add_argument('--model', type=str, default='Linear', choices=MODELS, help='model name')
 
         self.args = parser.parse_args()
         return self

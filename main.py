@@ -1,6 +1,7 @@
 import os
 import sys
-from utils import Options, SetSeed, BinanceDataset
+from utils import Options, SetSeed
+from data_factory import BinanceDataset
 import polars as pl
 import torch
 from losses import Evaluator
