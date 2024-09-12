@@ -1,6 +1,8 @@
 import torch.nn as nn
+from losses import rmseloss
 MSE = nn.MSELoss
 MAE = nn.L1Loss
+RMSE = rmseloss.RMSELoss
 
 # Automatically create a list of all classes imported in this file
 import sys
@@ -13,6 +15,7 @@ class Evaluator:
         self.metrics = {
             'MAE': MAE(),
             'MSE': MSE(),
+            'RMSE': RMSE()
         }
 
     def evaluate(self, y_pred, y):
